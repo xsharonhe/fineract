@@ -1048,6 +1048,14 @@ public class DataValidatorBuilder {
         return this;
     }
 
+    public DataValidatorBuilder validateBirthday() {
+        final String birthdayRegex = "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$";
+        final StringBuilder defaultEnglishMessage = new StringBuilder("The parameter `").append(this.parameter)
+                .append("` is in invalid format, should be in 'MM-DD' format.");
+        this.matchesRegularExpression(birthdayRegex, defaultEnglishMessage.toString());
+        return this;
+    }
+
     public DataValidatorBuilder validateCronExpression() {
         if (this.value != null && !CronExpression.isValidExpression(this.value.toString().trim())) {
             final StringBuilder validationErrorCode = new StringBuilder("validation.msg.").append(this.resource).append(".")

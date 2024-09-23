@@ -689,6 +689,18 @@ public class SavingsAccountHelper {
         return response;
     }
 
+    public Object getSavingsAccounts(String jsonAttribute) {
+        final String URL = SAVINGS_ACCOUNT_URL + "?" + Utils.TENANT_IDENTIFIER;
+        final Object response = Utils.performServerGet(requestSpec, responseSpec, URL, jsonAttribute);
+        return response;
+    }
+
+    public Object getSavingsAccounts(String birthday, String jsonAttribute) {
+        final String URL = SAVINGS_ACCOUNT_URL + "?birthday=" + birthday + "&" + Utils.TENANT_IDENTIFIER;
+        final Object response = Utils.performServerGet(requestSpec, responseSpec, URL, jsonAttribute);
+        return response;
+    }
+
     private HashMap performSavingApplicationActions(final String postURLForSavingsTransaction, final String jsonToBeSent,
             final Boolean isBlock) {
         HashMap status = null;
@@ -927,5 +939,4 @@ public class SavingsAccountHelper {
         return Utils.performServerPut(requestSpec, responseSpec, GSIM_URL,
                 updateGsimJSON(clientID.toString(), groupID.toString(), productID.toString()), "");
     }
-
 }

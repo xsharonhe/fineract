@@ -67,6 +67,7 @@ import org.apache.fineract.portfolio.savings.SavingsPostingInterestPeriodType;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountApplicationTimelineData;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountChargeData;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountData;
+import org.apache.fineract.portfolio.savings.data.SavingsAccountDataValidator;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountStatusEnumData;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountSubStatusEnumData;
 import org.apache.fineract.portfolio.savings.data.SavingsAccountSummaryData;
@@ -103,6 +104,7 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
     private final SavingsDropdownReadPlatformService dropdownReadPlatformService;
     private final DatabaseSpecificSQLGenerator sqlGenerator;
     private final ChargeReadPlatformService chargeReadPlatformService;
+    private final SavingsAccountDataValidator savingsAccountDataValidator;
 
     // mappers
     private final SavingsAccountTransactionTemplateMapper transactionTemplateMapper;
@@ -127,7 +129,7 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
             final ChargeReadPlatformService chargeReadPlatformService,
             final EntityDatatableChecksReadService entityDatatableChecksReadService, final ColumnValidator columnValidator,
             final SavingsAccountAssembler savingAccountAssembler, PaginationHelper paginationHelper,
-            DatabaseSpecificSQLGenerator sqlGenerator) {
+            DatabaseSpecificSQLGenerator sqlGenerator, final SavingsAccountDataValidator savingsAccountDataValidator) {
         this.context = context;
         this.jdbcTemplate = jdbcTemplate;
         this.clientReadPlatformService = clientReadPlatformService;
@@ -146,6 +148,7 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
         this.paginationHelper = paginationHelper;
         this.savingAccountMapperForInterestPosting = new SavingAccountMapperForInterestPosting();
         this.savingAccountAssembler = savingAccountAssembler;
+        this.savingsAccountDataValidator = savingsAccountDataValidator;
     }
 
     @Override
@@ -180,6 +183,7 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
 
     @Override
     public Page<SavingsAccountData> retrieveAll(final SearchParameters searchParameters) {
+        this.savingsAccountDataValidator.validateClientBirthday(searchParameters.getBirthday());
 
         final AppUser currentUser = this.context.authenticatedUser();
         final String hierarchy = currentUser.getOffice().getHierarchy();
@@ -192,7 +196,7 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
         sqlBuilder.append(" join m_office o on o.id = c.office_id");
         sqlBuilder.append(" where o.hierarchy like ?");
 
-        final Object[] objectArray = new Object[2];
+        final Object[] objectArray = new Object[4];
         objectArray[0] = hierarchySearchString;
         int arrayPos = 1;
         if (searchParameters != null) {
@@ -212,6 +216,15 @@ public class SavingsAccountReadPlatformServiceImpl implements SavingsAccountRead
                 sqlBuilder.append("and c.office_id =?");
                 objectArray[arrayPos] = searchParameters.getOfficeId();
                 arrayPos = arrayPos + 1;
+            }
+            if (searchParameters.getBirthday() != null) {
+                String[] dateParameters = searchParameters.getBirthday().split("-", 2);
+                final String month = dateParameters[0];
+                final String day = dateParameters[1];
+                sqlBuilder.append("and MONTH(c.date_of_birth) = ? and DAY(c.date_of_birth) = ?");
+                objectArray[arrayPos] = month;
+                objectArray[arrayPos + 1] = day;
+                arrayPos = arrayPos + 2;
             }
             if (searchParameters.isOrderByRequested()) {
                 sqlBuilder.append(" order by ").append(searchParameters.getOrderBy());

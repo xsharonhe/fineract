@@ -138,6 +138,95 @@ public class ClientSavingsIntegrationTest {
         // verifySavingsInterest(savingsInterest);
     }
 
+    private Integer createTestClientWithDateOfBirth(String dateOfBirth) {
+        final Integer clientID = ClientHelper.createClientWithDateOfBirth(this.requestSpec, this.responseSpec, dateOfBirth);
+        ClientHelper.verifyClientCreatedOnServer(this.requestSpec, this.responseSpec, clientID);
+        return clientID;
+    }
+
+    private Integer createTestSavingsProduct() {
+        final String minBalanceForInterestCalculation = null;
+        final String minRequiredBalance = null;
+        final String enforceMinRequiredBalance = "false";
+        final boolean allowOverdraft = false;
+        final Integer savingsProductID = createSavingsProduct(this.requestSpec, this.responseSpec, MINIMUM_OPENING_BALANCE,
+                minBalanceForInterestCalculation, minRequiredBalance, enforceMinRequiredBalance, allowOverdraft);
+        Assertions.assertNotNull(savingsProductID);
+        return savingsProductID;
+    }
+
+    private Integer testApplyForSavingsAccount(final Integer clientID, final Integer savingsProductID) {
+        final Integer savingsId = this.savingsAccountHelper.applyForSavingsApplication(clientID, savingsProductID, ACCOUNT_TYPE_INDIVIDUAL);
+        Assertions.assertNotNull(savingsProductID);
+
+        HashMap modifications = this.savingsAccountHelper.updateSavingsAccount(clientID, savingsProductID, savingsId,
+                ACCOUNT_TYPE_INDIVIDUAL);
+        Assertions.assertTrue(modifications.containsKey("submittedOnDate"));
+
+        HashMap savingsStatusHashMap = SavingsStatusChecker.getStatusOfSavings(this.requestSpec, this.responseSpec, savingsId);
+        SavingsStatusChecker.verifySavingsIsPending(savingsStatusHashMap);
+
+        savingsStatusHashMap = this.savingsAccountHelper.approveSavings(savingsId);
+        SavingsStatusChecker.verifySavingsIsApproved(savingsStatusHashMap);
+
+        savingsStatusHashMap = this.savingsAccountHelper.activateSavings(savingsId);
+        SavingsStatusChecker.verifySavingsIsActive(savingsStatusHashMap);
+        return savingsId;
+    }
+
+    public void testOpenSavingsAccount(String dateOfBirth) {
+        final Integer clientId = createTestClientWithDateOfBirth(dateOfBirth);
+        final Integer savingsProductId = createTestSavingsProduct();
+        testApplyForSavingsAccount(clientId, savingsProductId);
+    }
+
+    @Test
+    public void testSavingsRetrieveByBirthday() {
+        this.savingsAccountHelper = new SavingsAccountHelper(this.requestSpec, this.responseSpec);
+        final String birthdayMonth = "10";
+        final String birthdayDay = "05";
+        final String wrongBirthdayMonth = "11";
+        final String wrongBirthdayDay = "02";
+
+        final int startNumSavingsAccount = (int) this.savingsAccountHelper.getSavingsAccounts("totalFilteredRecords");
+        final int startNumSavingsAccountWithBirthday = (int) this.savingsAccountHelper.getSavingsAccounts(birthdayMonth + "-" + birthdayDay,
+                "totalFilteredRecords");
+        final int startNumSavingsAccountWithWrongBirthday = (int) this.savingsAccountHelper
+                .getSavingsAccounts(wrongBirthdayMonth + "-" + wrongBirthdayDay, "totalFilteredRecords");
+        testOpenSavingsAccount(birthdayDay + " " + birthdayMonth + " 2004");
+        final int endNumSavingsAccount = (int) this.savingsAccountHelper.getSavingsAccounts("totalFilteredRecords");
+        final int endNumSavingsAccountWithBirthday = (int) this.savingsAccountHelper.getSavingsAccounts(birthdayMonth + "-" + birthdayDay,
+                "totalFilteredRecords");
+        final int endNumSavingsAccountWithWrongBirthday = (int) this.savingsAccountHelper
+                .getSavingsAccounts(wrongBirthdayMonth + "-" + wrongBirthdayDay, "totalFilteredRecords");
+
+        assertEquals(1, endNumSavingsAccount - startNumSavingsAccount); // total accounts should increase by 1
+        // total accounts on the created client's birthday should increase by 1
+        assertEquals(1, endNumSavingsAccountWithBirthday - startNumSavingsAccountWithBirthday);
+        // total accounts on a different birthday should stay the same
+        assertEquals(0, endNumSavingsAccountWithWrongBirthday - startNumSavingsAccountWithWrongBirthday);
+    }
+
+    @Test
+    public void testSavingsRetrieveByBirthdayBatchCreateSameBirthday() {
+        this.savingsAccountHelper = new SavingsAccountHelper(this.requestSpec, this.responseSpec);
+        final String repeatedBirthdayMonth = "12";
+        final String repeatedBirthdayDay = "01";
+        final int numAccountsCreated = 16;
+        final int startYear = 1990;
+        final int startNumSavingsAccounts = (int) this.savingsAccountHelper
+                .getSavingsAccounts(repeatedBirthdayMonth + "-" + repeatedBirthdayDay, "totalFilteredRecords");
+        // same birthday, but different birth year
+        for (int i = startYear; i < startYear + numAccountsCreated - 1; ++i) {
+            testOpenSavingsAccount(repeatedBirthdayDay + " " + repeatedBirthdayMonth + " " + i);
+        }
+        // same birthday, same year
+        testOpenSavingsAccount(repeatedBirthdayDay + " " + repeatedBirthdayMonth + " " + startYear);
+        final int endNumSavingsAccounts = (int) this.savingsAccountHelper
+                .getSavingsAccounts(repeatedBirthdayMonth + "-" + repeatedBirthdayDay, "totalFilteredRecords");
+        assertEquals(numAccountsCreated, endNumSavingsAccounts - startNumSavingsAccounts);
+    }
+
     @Test
     public void testSavingsLastTransactionAndRunningBalanceUpdate() {
         this.savingsAccountHelper = new SavingsAccountHelper(this.requestSpec, this.responseSpec);
